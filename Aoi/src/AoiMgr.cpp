@@ -1,7 +1,8 @@
 #include "AoiMgr.h"
 #include "CustomAlgorithm.h"
 #include <string.h>
-
+#include <iostream>
+#include <cassert>
 using namespace std;
 
 AoiPoint::AoiPoint(uint64_t flag, Point2D pos): pos(pos),flag(flag),pGrid(nullptr),uid(0)
@@ -26,7 +27,7 @@ AoiPoint::~AoiPoint()
 	std::cout << str_format("AoiPoint Destruct... gridKey:%d  pos:(%f,%f)", pGrid->center.key, pos.x, pos.y) << std::endl;
 }
 
-void AoiPoint::SetPos(Point2D& pos)
+void AoiPoint::SetPos(Point2D pos)
 {
 	if (this->pos == pos)
 		return;
@@ -96,7 +97,7 @@ void AoiGrid::Debug()
 
 /*************************** AoiMgr ****************************************/
 
-AoiMgr::AoiMgr(const Point2D& mapSize, const uint32_t gridSize)
+AoiMgr::AoiMgr(Point2D mapSize, uint32_t gridSize)
 {
 	if (mapSize.x / gridSize > maxGridsCount ||
 		mapSize.y / gridSize > maxGridsCount)
@@ -120,8 +121,9 @@ AoiMgr::~AoiMgr()
 
 GridCenter AoiMgr::CalcGridCenter(const Point2D& pos)
 {
-	Point2D center = pos / gridSize;
-	return GridCenter((uint32_t)center.x, (uint32_t)center.y);
+	uint32_t x = uint32_t(pos.x / gridSize) * gridSize + gridSize/2;
+	uint32_t y = uint32_t(pos.y / gridSize) * gridSize + gridSize/2;
+	return GridCenter(x,y);
 }
 
 void AoiMgr::AddAoiPoint(AoiPoint& point)

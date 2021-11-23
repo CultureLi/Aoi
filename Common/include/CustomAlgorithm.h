@@ -28,5 +28,9 @@ public:
 		return n;
 	}
 
+	static bool NearEqual(float a, float b, float ep = 1e-06)
+	{
+		return abs(a - b) <= ep;
+	}
 };
 #endif //CUSTOM_ALGORITHM

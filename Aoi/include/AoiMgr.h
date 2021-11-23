@@ -20,7 +20,7 @@ public:
 	AoiPoint(uint64_t flag,Point2D pos);
 	~AoiPoint();
 
-	void SetPos(Point2D& pos);
+	void SetPos(Point2D pos);
 
 	uint64_t flag;
 	uint32_t flagHeadIndex;
@@ -77,13 +77,13 @@ private:
 
 };
 
-/******************************************** CTimerMgr***************************************/
+/******************************************** AoiMgr***************************************/
 
 class AoiMgr
 {
 	
 public:
-	AoiMgr(const Point2D& mapSize, const uint32_t gridSize);
+	AoiMgr(Point2D mapSize, uint32_t gridSize);
 	~AoiMgr();
 
 	GridCenter CalcGridCenter(const Point2D& pos);

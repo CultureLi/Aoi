@@ -1,26 +1,40 @@
 #pragma once
 #ifndef CUSTOM_MAP
 #define CUSTOM_MAP
-
-
 #include <map>
 #include <cassert>
+
+#define for_each(iter) \
+	for (iter=objMap.begin(); iter!=objMap.end(); iter++)
 
 template<typename TK,typename TV, uint32_t uidIndexBits, uint32_t flagBits>
 class CustomMap
 {
+// public:
+// 	CustomMap();
+// 	void SetFlag(uint32_t flag2);
+// 	TK AddData(TV value);
+// 	TV GetData(TK key);
+// 	void DelData(TK key);
+// 
+private:
+	uint32_t flag; //用于生成的uid高32为
+	uint32_t uidIndex;//自增，uid的低32位
+public:
+	std::map<TK, TV> objMap;
 public:
 	CustomMap()
 	{
 		int a = sizeof(TK);
-		assert(uidIndexBits + flagBits <= 8 * sizeof(TK),"uidIndexBits + flagBits > TK size");
+		assert(uidIndexBits + flagBits <= 8 * sizeof(TK));
 		flag = 0;
 		uidIndex = 0;
 	}
 
+
 	void SetFlag(uint32_t flag2)
 	{
-		assert(flag2 < (1<<flagBits), "flag out of range");
+		assert(flag2 < (1 << flagBits));
 		this->flag = flag2;
 	}
 
@@ -34,12 +48,16 @@ public:
 		return key;
 	}
 
+	//template<typename TK, typename TV, uint32_t uidIndexBits, uint32_t flagBits>
 	TV GetData(TK key)
 	{
-		std::map<TK,TV>::iterator iter = objMap.find(key);
+		auto iter = objMap.find(key);
 		if (iter != objMap.end())
 			return iter->second;
 	}
+
+
+
 
 	void DelData(TK key)
 	{
@@ -47,10 +65,9 @@ public:
 	}
 
 
-private:
-	uint32_t flag; //用于生成的uid高32为
-	uint32_t uidIndex;//自增，uid的低32位
-	std::map<TK, TV> objMap;
 };
 
 #endif // !CUSTOM_MAP
+
+
+

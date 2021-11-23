@@ -40,6 +40,12 @@ macro(build_lib)
     add_library(${PROJECT_NAME} STATIC ${headlist} ${sourcelist})
 endmacro(build_lib)
 
+
+macro(build_dll)
+	source_by_group()
+    add_library(${PROJECT_NAME} SHARED ${headlist} ${sourcelist})
+endmacro(build_dll)
+
 macro(build_exe)
     source_by_group()
     add_executable(${PROJECT_NAME} ${headlist} ${sourcelist})
