@@ -3,6 +3,13 @@
 #include "Rectangle.h"
 namespace Custom_Develop
 {
+	enum EPosionalType
+	{
+		E_Inside = 1, //内
+		E_Intersect = 2, //相交
+		E_Outside = 3//外
+	};
+
 	class Circle
 	{
 	public:
@@ -11,7 +18,7 @@ namespace Custom_Develop
 		bool Contain(Point2D&);
 		bool Contain(Custom_Develop::Rectangle&);
 		// check the posional relationship between circel and rect ：-1 inner；0 Intersect；1 outer 
-		int CheckPosionalSide(Custom_Develop::Rectangle&);
+		EPosionalType CheckPosionalSide(Custom_Develop::Rectangle&);
 		// 圆的外切矩形
 		Custom_Develop::Rectangle GetOutSideRect();
 		// 圆的内接矩形

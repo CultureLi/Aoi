@@ -8,6 +8,7 @@
 #include "CIntrusiveList.h"
 #include "CustomMap.h"
 #include "Rectangle.h"
+#include "Circle.h"
 
 using namespace Custom_Develop;
 
@@ -18,19 +19,21 @@ class AoiGrid;
 class AoiMgr;
 class AoiPoint;
 class FlagFilter;
+class AoiTrigger;
 typedef void(*ForeachPointFun)(AoiPoint*, void*);
 typedef void(*ForeachGridFun)(AoiGrid*, void*);
+typedef void(*ForeachTriggerFun)(AoiTrigger*, void*);
 /******************************************** AoiPoint ***************************************/
 
 class AoiPoint
 {
 public:
-	AoiPoint(uint64_t flag,Point2D pos);
+	AoiPoint(AoiMgr*pMgr, uint64_t flag,Point2D pos);
 	~AoiPoint();
 
 	void SetPos(Point2D pos);
 
-	uint64_t AddTrigger(uint64_t flag, float enterDis, float exitDis);
+	void BindTrigger(uint32_t triggerId);
 	void UpdateTriggers();
 
 	uint64_t flag;
@@ -43,7 +46,7 @@ public:
 
 	Point2D pos;
 
-	std::list<uint64_t> triggerList;
+	std::set<uint64_t> triggerSet;
 };
 
 /******************************************** AoiGrid***************************************/
@@ -77,10 +80,10 @@ public:
 	AoiGrid(const GridKey&, AoiMgr* mgr);
 	~AoiGrid();
 	GridKey key;
-	void AddPoint(AoiPoint&);
-	void DelPoint(AoiPoint&);
-	void UpdateTrigger();
+	void AddPoint(AoiPoint*);
+	void DelPoint(AoiPoint*);
 	void ForeachPoint(FlagFilter filter, ForeachPointFun fun,void* args);
+	void ForeachTrigger(AoiPoint* point);
 
 	list_head flagHead[All_Flag_Type];
 
@@ -89,8 +92,8 @@ public:
 
 	Custom_Develop::Rectangle box;
 
-	//触发器是否包含
-	std::map<uint32_t, int> containMap; 
+	//和触发器的位置关系（包含和相交,在触发器外会被移除)
+	std::map<uint32_t, EPosionalType> triggerSideMap;
 
 	void Debug();
 
@@ -101,6 +104,14 @@ private:
 
 };
 /******************************************** AoiTrigger***************************************/
+struct GridHandleArgs
+{
+	AoiTrigger* pTrigger;
+	EPosionalType enterSide;
+	EPosionalType exitSide;
+
+};
+
 class FlagFilter
 {
 public:
@@ -113,17 +124,13 @@ public:
 class AoiTrigger
 {
 public:
-	AoiTrigger(uint64_t flag,float enterDis,float exitDis);
+	AoiTrigger(uint64_t flag,float enterDis,float cacheDis);
 	~AoiTrigger();
 
 	FlagFilter filter;
 
 	float enterDis;
 	float exitDis;
-
-	Custom_Develop::Rectangle enterRect;
-	Custom_Develop::Rectangle exitRect;
-
 	
 	std::set<uint64_t> gridSet;
 	std::set<uint64_t> pointSet;
@@ -152,8 +159,9 @@ public:
 
 	GridKey CalcGridKey(const Point2D& pos);
 
-	void AddAoiPoint(AoiPoint&);
+	void AddAoiPoint(AoiPoint*);
 	AoiGrid* AddGrid(const GridKey& center);
+	uint32_t CreateTrigger(uint64_t flag, float enterDis, float cacheDis);
 
 public:
 	Point2D mapSize;
@@ -166,7 +174,7 @@ private:
 public:
 	CustomMap<uint64_t, AoiPoint*, 64, 0> pointMap;
 	std::map<uint64_t, AoiGrid*> gridMap;
-	CustomMap<uint64_t, AoiTrigger*, 32, 0> triggerMap;
+	CustomMap<uint32_t, AoiTrigger*, 32, 0> triggerMap;
 };
 
 

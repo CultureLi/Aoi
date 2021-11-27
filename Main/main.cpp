@@ -13,6 +13,8 @@ uint32_t gridSize = 100; //格子大小
 uint32_t halfSize = gridSize / 2;
 
 AoiPoint* controlPoint;
+AoiPoint* controlPoint2;
+Point2D mousePos;
 
 void Draw(AoiMgr* mgr)
 {
@@ -22,11 +24,11 @@ void Draw(AoiMgr* mgr)
 
 	controlPoint->UpdateTriggers();
 
-	for (auto triggerId : controlPoint->triggerList)
+	for (auto triggerId : controlPoint->triggerSet)
 	{
 		AoiTrigger* pTrigger = mgr->triggerMap.GetData(triggerId);
 
-
+		//画格子
 		std::map<uint64_t, AoiGrid*>::iterator iter1 = mgr->gridMap.begin();
 		for (; iter1 != mgr->gridMap.end(); ++iter1)
 		{
@@ -47,10 +49,11 @@ void Draw(AoiMgr* mgr)
 		}
 
 
-
+		// 画点
 		std::map<uint64_t, AoiPoint*>::iterator iter = mgr->pointMap.objMap.begin();
 		for (; iter != mgr->pointMap.objMap.end(); ++iter)
 		{
+			// control
 			if (iter->second == controlPoint)
 			{
 				setlinestyle(PS_SOLID | PS_JOIN_BEVEL, 5);
@@ -77,6 +80,8 @@ void Draw(AoiMgr* mgr)
 		}
 	}
 
+	
+
 	RECT r = { 0, 0, 200, 20 };
 	auto s = str_format("GridKey %d %d", controlPoint->pGrid->key.x, controlPoint->pGrid->key.y);
 	drawtext(s.c_str(), &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -93,28 +98,31 @@ void MessageOpe(AoiMgr* mgr)
 
 	switch (m.message)
 	{
+	case WM_MOUSEMOVE:
+		mousePos.x = m.x;
+		mousePos.y = m.y;
+		break;
 
 	case WM_LBUTTONDOWN:
 		// 如果点左键的同时按下了 Ctrl 键
-		mgr->AddAoiPoint(*new AoiPoint(1, Point2D(m.x, m.y)));
+
 		break;
 	case WM_RBUTTONDOWN:
-		controlPoint->SetPos(Point2D(m.x,m.y));
+
 		break;
 	case WM_KEYDOWN:
-		auto x = controlPoint->pos.x;
-		auto y = controlPoint->pos.y;
-		if (m.vkcode == 0x57)
-			y -= 10;
-		else if (m.vkcode == 0x53)
-			y += 10;
-
-		if (m.vkcode == 0x41)
-			x -= 10;
-		else if (m.vkcode == 0x44)
-			x += 10;
-
-		controlPoint->SetPos(Point2D(x, y));
+		switch (m.vkcode)
+		{
+		case 0x31:
+			mgr->AddAoiPoint(new AoiPoint(mgr,1, Point2D(mousePos.x, mousePos.y)));
+			break;
+		case 0x32:
+			controlPoint->SetPos(Point2D(mousePos.x, mousePos.y));
+			break;
+		case 0x33:
+			controlPoint2->SetPos(Point2D(mousePos.x, mousePos.y));
+			break;
+		}
 	}
 }
 
@@ -125,14 +133,19 @@ int main()
 
 	AoiMgr* mgr =  new AoiMgr(mapSize, gridSize);
 
-	controlPoint = new AoiPoint(1, Point2D(mapSize.x/2, mapSize.y/2));
-	mgr->AddAoiPoint(*controlPoint);
+	controlPoint = new AoiPoint(mgr,10, Point2D(mapSize.x/2, mapSize.y/2));
+	mgr->AddAoiPoint(controlPoint);
+	controlPoint2 = new AoiPoint(mgr,1, Point2D(mapSize.x / 2, mapSize.y / 2));
+	mgr->AddAoiPoint(controlPoint2);
+
 	for (int i = 0; i < gridSize * 10; i++)
 	{
-		mgr->AddAoiPoint(*new AoiPoint(rand()%5, Point2D(rand()%int(mapSize.x),rand()%int(mapSize.y))));
+		mgr->AddAoiPoint(new AoiPoint(mgr,rand()%5, Point2D(rand()%int(mapSize.x),rand()%int(mapSize.y))));
 	}
 
-	controlPoint->AddTrigger(1, 200, 250);
+	auto id = mgr->CreateTrigger(1, 200, 50);
+
+	controlPoint->BindTrigger(id);
 
 	/*for (int i = halfSize; i <= mapSize.x; i += gridSize)
 	{

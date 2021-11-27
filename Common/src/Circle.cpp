@@ -31,13 +31,10 @@ namespace Custom_Develop
 		return true;
 	}
 
-	int Circle::CheckPosionalSide(Custom_Develop::Rectangle& rect)
+	EPosionalType Circle::CheckPosionalSide(Custom_Develop::Rectangle& rect)
 	{
-		//-1 inner£»0 Intersect£»1 outer 
 		auto size = rect.bottomRight - rect.topLeft;
 
-		//auto topRight = rect.topLeft + Point2D(size.x,0);
-		//auto bottomLeft = rect.topLeft + Point2D(0, size.y);
 		auto v = Point2D();
 		int inSideCount = 0;
 		for (int x = rect.topLeft.x; x <= rect.bottomRight.x; x += int(size.x))
@@ -53,11 +50,11 @@ namespace Custom_Develop
 
 
 		if (inSideCount == 4)
-			return -1;
+			return EPosionalType::E_Inside;
 		else if (inSideCount == 0)
-			return 1;
+			return EPosionalType::E_Outside;
 		else
-			return 0;
+			return EPosionalType::E_Intersect;
 	}
 
 	Custom_Develop::Rectangle Circle::GetOutSideRect()

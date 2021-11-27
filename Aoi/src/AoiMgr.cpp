@@ -7,9 +7,29 @@
 #include "Circle.h"
 using namespace std;
 
-#define Inside_Circle -1 //在圆内
-#define Intersect_Circle 0 //相交
-#define Outside_Circle 1 //在圆外
+void HandlePointInTrigger(AoiPoint* point, void* args)
+{
+	GridHandleArgs* pArgs = (GridHandleArgs*)args;
+
+	if (pArgs->enterSide == EPosionalType::E_Inside)
+	{
+		pArgs->pTrigger->pointSet.insert(point->uid);
+	}
+	else if (pArgs->exitSide == EPosionalType::E_Outside)
+	{
+		pArgs->pTrigger->pointSet.erase(point->uid);
+	}
+	else if (pArgs->enterSide == EPosionalType::E_Intersect
+		|| pArgs->exitSide == EPosionalType::E_Intersect)
+	{
+		float distance = Point2D::Distance(point->pos, pArgs->pTrigger->pos);
+		if (distance < pArgs->pTrigger->enterDis)
+			pArgs->pTrigger->pointSet.insert(point->uid);
+		else if (distance > pArgs->pTrigger->exitDis)
+			pArgs->pTrigger->pointSet.erase(point->uid);
+	}
+
+}
 
 uint16_t CalcFlagIndex(uint64_t flag)
 {
@@ -25,8 +45,10 @@ uint16_t CalcFlagIndex(uint64_t flag)
 	return flagIndex;
 }
 
-AoiPoint::AoiPoint(uint64_t flag, Point2D pos): pos(pos),flag(flag),pGrid(nullptr),uid(0)
+AoiPoint::AoiPoint(AoiMgr* pMgr, uint64_t flag, Point2D pos): pos(pos),flag(flag),pGrid(nullptr)
 {
+	assert(pMgr);
+	this->uid = pMgr->pointMap.AddData(this);
 	flagType = CalcFlagIndex(flag);
 	INIT_LIST_HEAD(&head);
 }
@@ -34,9 +56,10 @@ AoiPoint::~AoiPoint()
 {
 	if(!list_empty(&head))
 		list_del_init(&head);
-
-	pGrid->pMgr->pointMap.DelData(uid);
-	std::cout << str_format("AoiPoint Destruct... gridKey:%d  pos:(%f,%f)", pGrid->key.key, pos.x, pos.y) << std::endl;
+	if(pGrid)
+		pGrid->DelPoint(this);
+	pGrid = nullptr;
+	//std::cout << str_format("AoiPoint Destruct... gridKey:%d  pos:(%f,%f)", pGrid->key.key, pos.x, pos.y) << std::endl;
 }
 
 void AoiPoint::SetPos(Point2D pos)
@@ -44,26 +67,29 @@ void AoiPoint::SetPos(Point2D pos)
 	if (this->pos == pos)
 		return;
 	this->pos = pos;
-	pGrid->pMgr->AddAoiPoint(*this);
+
+	pGrid->pMgr->AddAoiPoint(this);
 }
 
-uint64_t AoiPoint::AddTrigger(uint64_t flag, float enterDis, float exitDis)
+void AoiPoint::BindTrigger(uint32_t triggerId)
 {
-	AoiTrigger* pTrigger = new AoiTrigger(flag,enterDis,exitDis);
-	pTrigger->pMgr = pGrid->pMgr;
-	uint64_t triggerId = pGrid->pMgr->triggerMap.AddData(pTrigger);
-	triggerList.push_back(triggerId);
-	return triggerId;
+	triggerSet.emplace(triggerId);
 }
 
 void AoiPoint::UpdateTriggers()
 {
-	for (auto triggerId : triggerList)
+	for (auto triggerId : triggerSet)
 	{
 		AoiTrigger* pTrigger = pGrid->pMgr->triggerMap.GetData(triggerId);
 		if (pTrigger)
+		{
+			if (pTrigger->pos == pos)
+			{
+				//continue;
+			}
 			pTrigger->pos = pos;
 			pTrigger->Update();
+		}
 	}
 }
 
@@ -93,36 +119,72 @@ AoiGrid::~AoiGrid()
 	std::cout << str_format("AoiGrid Destruct... gridKey:%d  center:(%d,%d)",key.key, key.x, key.y) << std::endl;
 }
 
-void AoiGrid::AddPoint(AoiPoint& point)
+
+void AoiGrid::ForeachTrigger(AoiPoint* point)
 {
-	if (point.pGrid == this)
+	
+	for (auto iter : triggerSideMap)
+	{
+		AoiTrigger* pTrigger = pMgr->triggerMap.GetData(iter.first);
+		if (pTrigger == nullptr)
+			continue;
+
+		if ((pTrigger->filter.flag & point->flag) == 0)
+			continue;
+
+		
+		Circle enterCircle = Circle(pTrigger->pos, pTrigger->enterDis);
+		Circle exitCircle = Circle(pTrigger->pos, pTrigger->exitDis);
+			
+		GridHandleArgs args
+		{
+			pTrigger,
+			enterCircle.CheckPosionalSide(point->pGrid->box),
+			exitCircle.CheckPosionalSide(point->pGrid->box)
+		};
+
+		HandlePointInTrigger(point, (void*)&args);
+		
+	}
+}
+
+void AoiGrid::AddPoint(AoiPoint* point)
+{
+	if (point->pGrid == this)
 		return;
 
-	if (point.flagType == Complex_Flag_Type)
+	if (point->flagType == Complex_Flag_Type)
 	{
-		complexFlag |= point.flag;
+		complexFlag |= point->flag;
 	}
 	else
 	{
-		singleFlag |= point.flag;
+		singleFlag |= point->flag;
 	}
 
-	point.pGrid = this;
-	list_move(&point.head, flagHead + point.flagType);
+	point->pGrid = this;
+	list_move(&point->head, flagHead + point->flagType);
 
-	std::cout << str_format("AoiGrid AddPoint center:(%d,%d)	point:(%f,%f)", key.x, key.y,point.pos.x,point.pos.y)<< std::endl;
+	ForeachTrigger(point);
+
+	//std::cout << str_format("AoiGrid AddPoint center:(%d,%d)	point:(%f,%f)", key.x, key.y,point.pos.x,point.pos.y)<< std::endl;
 }
 
-void AoiGrid::DelPoint(AoiPoint& point)
+
+
+void AoiGrid::DelPoint(AoiPoint* point)
 {
-	if (list_empty(flagHead + point.flagType))
+	if (list_empty(flagHead + point->flagType))
 	{
-		if (point.flagType == Complex_Flag_Type)
+		if (point->flagType == Complex_Flag_Type)
 			complexFlag = 0;
 		else
-			singleFlag ^= point.flagType;
+			singleFlag ^= point->flagType;
 	}
-	std::cout << str_format("AoiGrid DelPoint center:(%d,%d)	point:(%f,%f)", key.x, key.y, point.pos.x, point.pos.y) << std::endl;
+
+	ForeachTrigger(point);
+
+	//std::cout << str_format("AoiGrid DelPoint center:(%d,%d)	point:(%f,%f)", key.x, key.y, point.pos.x, point.pos.y) << std::endl;
 }
 
 void AoiGrid::Debug()
@@ -166,10 +228,6 @@ void AoiGrid::ForeachPoint(FlagFilter filter, ForeachPointFun fun, void* args)
 	}
 }
 
-void AoiGrid::UpdateTrigger()
-{
-
-}
 /*************************** AoiTrigger ****************************************/
 FlagFilter::FlagFilter(uint64_t flag)
 {
@@ -184,48 +242,16 @@ FlagFilter::FlagFilter(uint64_t flag)
 }
 
 
-
-AoiTrigger::AoiTrigger(uint64_t flag, float enterDis, float exitDis):filter(flag)
+AoiTrigger::AoiTrigger(uint64_t flag, float enterDis, float cacheDis):filter(flag)
 {
 	this->enterDis = enterDis;
-	this->exitDis = exitDis;
+	this->exitDis = enterDis+cacheDis;
 
 }
 
 AoiTrigger::~AoiTrigger()
 {
 
-}
-
-struct GridHandleArgs
-{
-	AoiTrigger* pTrigger;
-	Point2D pos;
-	int side; //-1 inner；0 Intersect；1 outer
-};
-
-void _GridEnterTrigger(AoiPoint* point, void* args)
-{
-	GridHandleArgs* pArgs = (GridHandleArgs*)args;
-	if (pArgs->side == Inside_Circle)
-		pArgs->pTrigger->pointSet.insert(point->uid);
-	else if (pArgs->side == Intersect_Circle)
-	{
-		if (Point2D::Distance(point->pos, pArgs->pos) <= pArgs->pTrigger->enterDis)
-			pArgs->pTrigger->pointSet.insert(point->uid);
-	}
-}
-
-void _GridExitTrigger(AoiPoint* point, void* args)
-{
-	GridHandleArgs* pArgs = (GridHandleArgs*)args;
-	if (pArgs->side == Outside_Circle)
-		pArgs->pTrigger->pointSet.erase(point->uid);
-	else if (pArgs->side == Intersect_Circle)
-	{
-		if (Point2D::Distance(point->pos, pArgs->pos) >= pArgs->pTrigger->exitDis)
-			pArgs->pTrigger->pointSet.erase(point->uid);
-	}
 }
 
 void AoiTrigger::Update()
@@ -251,29 +277,12 @@ void AoiTrigger::UpdateGrid()
 			if (pGrid == nullptr)
 				continue;
 
-			int oldContain = pGrid->containMap[this->uid];
-
-			int newSide = enterCircle.CheckPosionalSide(pGrid->box);
-
-			pGrid->containMap[this->uid] = newSide;
-
 			if (gridSet.find(key) == gridSet.end())
 			{
-				gridSet.emplace(key);
-
-				GridHandleArgs args = { this,this->pos,newSide};
-				pGrid->ForeachPoint(filter, _GridEnterTrigger, (void*)&args);
-				continue;
+				int newSide = enterCircle.CheckPosionalSide(pGrid->box);
+				if(newSide != EPosionalType::E_Outside)
+					gridSet.emplace(key);
 			}
-
-			//// 上次跟本次都在圆内，不处理
-			//if (newSide == Inside_Circle && oldContain == Inside_Circle)
-			//{
-			//	continue;
-			//}
-
-			//GridHandleArgs args = { this,this->pos,newSide };
-			//pGrid->ForeachPoint(filter, _GridEnterTrigger, (void*)&args);
 		}
 	}
 
@@ -286,29 +295,23 @@ void AoiTrigger::UpdateGrid()
 		if (pGrid == nullptr)
 			continue;
 
-		// 上次跟本次都在圆内，不处理
-		int enterSide = enterCircle.CheckPosionalSide(pGrid->box);
-		if (enterSide == Inside_Circle)
+		EPosionalType oldEnterSide = pGrid->triggerSideMap[this->uid];
+		EPosionalType newEnterSide = enterCircle.CheckPosionalSide(pGrid->box);
+		EPosionalType exitside = exitCircle.CheckPosionalSide(pGrid->box);
+		pGrid->triggerSideMap[this->uid] = newEnterSide;
+
+		if (oldEnterSide == EPosionalType::E_Inside && newEnterSide == EPosionalType::E_Inside)
 		{
 			continue;
 		}
 
-		if(enterSide == Intersect_Circle)
-		{ 
-			GridHandleArgs args = { this,this->pos,enterSide};
-			pGrid->ForeachPoint(filter, _GridEnterTrigger, (void*)&args);
-		}
+		GridHandleArgs args = { this,newEnterSide,exitside };
+		pGrid->ForeachPoint(filter, HandlePointInTrigger, (void*)&args);
 
-
-		int side = exitCircle.CheckPosionalSide(pGrid->box);
-		if (side == Outside_Circle)
+		
+		if (exitside == EPosionalType::E_Outside)
 		{
 			needRemoveGrids.insert(key);
-		}
-		if (side != Inside_Circle)
-		{
-			GridHandleArgs args = { this,this->pos,side};
-			pGrid->ForeachPoint(filter, _GridExitTrigger, (void*)&args);
 		}
 		
 	}
@@ -318,7 +321,7 @@ void AoiTrigger::UpdateGrid()
 		AoiGrid* pGrid = pMgr->gridMap[key];
 		if (pGrid == nullptr)
 			continue;
-		pGrid->containMap.erase(this->uid);
+		pGrid->triggerSideMap.erase(this->uid);
 		gridSet.erase(key);
 
 	}
@@ -357,35 +360,41 @@ GridKey AoiMgr::CalcGridKey(const Point2D& pos)
 	return GridKey(x,y);
 }
 
-void AoiMgr::AddAoiPoint(AoiPoint& point)
-{
-	// 第一次添加
-	if (point.uid == 0)
-		point.uid = pointMap.AddData(&point);
-
-	// 仍然在同一个grid中
-	GridKey gridCenter = CalcGridKey(point.pos);
-	if (point.pGrid && point.pGrid->key == gridCenter)
-		return;
-	// 所在grid发生变化
-	AoiGrid* pOldGrid = point.pGrid;
-	AoiGrid* pGrid = AddGrid(gridCenter);
-	pGrid->AddPoint(point);
-	if(pOldGrid != nullptr)
-		pOldGrid->DelPoint(point);
-
-}
-
 AoiGrid* AoiMgr::AddGrid(const GridKey& gridKey)
 {
 	AoiGrid* pGrid = gridMap[gridKey.key];
 	if (pGrid == nullptr)
 	{
-		pGrid = new AoiGrid(gridKey,this);
+		pGrid = new AoiGrid(gridKey, this);
 		assert(pGrid);
 		gridMap[gridKey.key] = pGrid;
 	}
-		
+
 	return pGrid;
 }
 
+void AoiMgr::AddAoiPoint(AoiPoint* point)
+{
+	// 仍然在同一个grid中
+	GridKey gridKey = CalcGridKey(point->pos);
+	if (point->pGrid
+		&& point->pGrid->key == gridKey)
+		return;
+	// 所在grid发生变化
+	AoiGrid* pOldGrid = point->pGrid;
+	AoiGrid* pGrid = AddGrid(gridKey);
+	//point->pGrid = pGrid;
+	pGrid->AddPoint(point);
+	if (pOldGrid != nullptr)
+		pOldGrid->DelPoint(point);
+
+	
+}
+
+uint32_t AoiMgr::CreateTrigger(uint64_t flag, float enterDis, float cacheDis)
+{
+	AoiTrigger* pTrigger = new AoiTrigger(flag, enterDis, cacheDis);
+	pTrigger->pMgr = this;
+	pTrigger->uid = triggerMap.AddData(pTrigger);
+	return pTrigger->uid;
+}

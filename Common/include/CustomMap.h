@@ -54,6 +54,7 @@ namespace Custom_Develop
 			auto iter = objMap.find(key);
 			if (iter != objMap.end())
 				return iter->second;
+			return nullptr;
 		}
 
 
