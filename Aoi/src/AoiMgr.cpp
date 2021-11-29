@@ -244,34 +244,14 @@ void AoiTrigger::Update()
 	UpdateGrid();
 }
 
+
+
 void AoiTrigger::UpdateGrid()
 {
 	Circle enterCircle = Circle(pos, enterDis);
 	Rectangle enterRect = enterCircle.GetOutSideRect();
-	
-	//以pos为圆心，enterDis为半径，圆的外切矩形
-	GridKey gMin = pMgr->CalcGridKey(enterRect.topLeft);
-	GridKey gMax = pMgr->CalcGridKey(enterRect.bottomRight);
 
-
-	// 跟外切矩形相交、包含的grid
-	for (uint32_t x = gMin.x; x <= gMax.x; x++)
-	{
-		for (uint32_t y = gMin.y; y <= gMax.y; y++)
-		{
-			uint64_t key = GENUUID64(x, y);
-			AoiGrid* pGrid = pMgr->gridMap[key];
-			if (pGrid == nullptr)
-				continue;
-
-			if (gridSet.find(key) == gridSet.end())
-			{
-				int newSide = enterCircle.CheckPosionalSide(pGrid->box);
-				if(newSide != EPosionalType::E_Outside)
-					gridSet.emplace(key);
-			}
-		}
-	}
+	pMgr->CalcGridsInRange(enterCircle, gridSet);
 
 	Circle exitCircle = Circle(pos, exitDis);
 	Rectangle exitRect = exitCircle.GetOutSideRect();
@@ -385,4 +365,108 @@ uint32_t AoiMgr::CreateTrigger(uint64_t flag, float enterDis, float cacheDis)
 	pTrigger->pMgr = this;
 	pTrigger->uid = triggerMap.AddData(pTrigger);
 	return pTrigger->uid;
+}
+
+
+void AoiMgr::CalcGridsInRange(Circle circle, std::set<uint64_t>& gridSet)
+{
+	Rectangle rect = circle.GetOutSideRect();
+
+	//以pos为圆心，圆的外切矩形
+	GridKey gMin = CalcGridKey(rect.topLeft);
+	GridKey gMax = CalcGridKey(rect.bottomRight);
+
+
+	// 跟外切矩形相交、包含的grid
+	for (uint32_t x = gMin.x; x <= gMax.x; x++)
+	{
+		for (uint32_t y = gMin.y; y <= gMax.y; y++)
+		{
+			uint64_t key = GENUUID64(x, y);
+			auto iter = gridMap.find(key);
+			if (iter == gridMap.end())
+				continue;
+
+			AoiGrid* pGrid = iter->second;
+			if (gridSet.find(key) == gridSet.end())
+			{
+				int newSide = circle.CheckPosionalSide(pGrid->box);
+				if (newSide != EPosionalType::E_Outside)
+					gridSet.emplace(key);
+			}
+		}
+	}
+}
+
+
+struct CollectPointArgs
+{
+	AoiGrid* pGrid;
+	Circle &circle;
+	EPosionalType side;
+	std::list<AoiPoint*>& lst;
+};
+void CollectPoint(AoiPoint* point,void* args)
+{
+	CollectPointArgs* pArgs = (CollectPointArgs*)args;
+	switch (pArgs->side)
+	{
+		case EPosionalType::E_Inside:
+			pArgs->lst.push_back(point);
+			break;
+		case EPosionalType::E_Intersect:
+		{
+			if(pArgs->circle.Contain(point->pos))
+				pArgs->lst.push_back(point);
+		}
+		break;
+	}
+}
+
+
+class dis_sorter
+{
+public:
+	dis_sorter(Point2D c) :center(c) {};
+	Point2D center;
+
+	bool operator () (const AoiPoint* p1, const AoiPoint* p2)
+	{
+		float dis1 = Point2D::DistanceSqrt(center, p1->pos);
+		float dis2 = Point2D::DistanceSqrt(center, p2->pos);
+		if (dis1 == dis2)
+			return p1->uid>p2->uid;
+		else
+			return dis1 < dis2;
+	}
+};
+
+std::list<AoiPoint*> AoiMgr::GetNearPoints(Point2D pos,float dis, uint64_t flag,int maxCount)
+{
+	std::set<uint64_t> gridSet;
+	Circle circle = Circle(pos, dis);
+	CalcGridsInRange(circle,gridSet);
+	std::list<AoiPoint*> lst;
+	for (auto key : gridSet)
+	{
+		auto iter = gridMap.find(key);
+		if (iter == gridMap.end())
+			continue;
+
+		AoiGrid* pGrid = iter->second;
+
+		EPosionalType side = circle.CheckPosionalSide(pGrid->box);
+		if (side == EPosionalType::E_Outside)
+			continue;
+
+		CollectPointArgs args{ pGrid,circle,side,lst };
+		pGrid->ForeachPoint(FlagFilter(flag), CollectPoint, (void*)&args);
+	}
+	
+
+	lst.sort(dis_sorter(pos));
+	if (maxCount > 0 && lst.size() > maxCount)
+		lst.resize(maxCount);
+
+	return lst;
 }

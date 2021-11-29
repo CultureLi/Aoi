@@ -18,10 +18,6 @@ Point2D mousePos;
 
 void Draw(AoiMgr* mgr)
 {
-	
-	
-
-
 	controlPoint->UpdateTriggers();
 
 	for (auto triggerId : controlPoint->triggerSet)
@@ -126,6 +122,44 @@ void MessageOpe(AoiMgr* mgr)
 	}
 }
 
+
+void CollectTest(AoiMgr* mgr)
+{
+	controlPoint->UpdateTriggers();
+	//画格子
+	std::map<uint64_t, AoiGrid*>::iterator iter1 = mgr->gridMap.begin();
+	for (; iter1 != mgr->gridMap.end(); ++iter1)
+	{
+		auto key = iter1->second->key;
+		AoiGrid* pGrid = iter1->second;
+		setlinecolor(BLACK);
+		setlinestyle(PS_SOLID, 1);
+		rectangle(iter1->second->box.topLeft.x, iter1->second->box.topLeft.y, iter1->second->box.bottomRight.x, iter1->second->box.bottomRight.y);
+	}
+
+
+	auto lst = mgr->GetNearPoints(controlPoint->pos, 150, 1);
+
+	// 画点
+	std::map<uint64_t, AoiPoint*>::iterator iter = mgr->pointMap.objMap.begin();
+	for (; iter != mgr->pointMap.objMap.end(); ++iter)
+	{
+		setfillcolor(LIGHTGRAY);
+		fillcircle(iter->second->pos.x, iter->second->pos.y, 3);
+	}
+
+	float i = 10;
+	for (auto point : lst)
+	{
+		setfillcolor(RED);
+		fillcircle(point->pos.x, point->pos.y, i);
+		i -= 0.5;
+		i = max(i, 1);
+
+	}
+	
+}
+
 int main()
 {	
 	initgraph(mapSize.x+gridSize, mapSize.y+gridSize);	// 地图大小
@@ -138,7 +172,7 @@ int main()
 	controlPoint2 = new AoiPoint(mgr,1, Point2D(mapSize.x / 2, mapSize.y / 2));
 	mgr->AddAoiPoint(controlPoint2);
 
-	for (int i = 0; i < gridSize * 10; i++)
+	for (uint32_t i = 0; i < gridSize * 10; i++)
 	{
 		mgr->AddAoiPoint(new AoiPoint(mgr,rand()%5, Point2D(rand()%int(mapSize.x),rand()%int(mapSize.y))));
 	}
@@ -146,13 +180,6 @@ int main()
 	auto id = mgr->CreateTrigger(1, 200, 20);
 
 	controlPoint->BindTrigger(id);
-
-	/*for (int i = halfSize; i <= mapSize.x; i += gridSize)
-	{
-		for (int j = halfSize; j <= mapSize.y; j += gridSize)
-			mgr->AddAoiPoint(*new AoiPoint(1, Point2D(i, j)));
-
-	}*/
 	
 	//	// 画圆，圆心(200, 200)，半径 100
 	double lastUpdate = GetTickCount();
@@ -165,6 +192,7 @@ int main()
 			cleardevice();
 			BeginBatchDraw();
 			Draw(mgr);
+			//CollectTest(mgr);
 			EndBatchDraw();
 		}
 	}

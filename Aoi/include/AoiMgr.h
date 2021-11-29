@@ -163,14 +163,15 @@ public:
 	AoiGrid* AddGrid(const GridKey& center);
 	uint32_t CreateTrigger(uint64_t flag, float enterDis, float cacheDis);
 
+	void CalcGridsInRange(Circle circle, std::set<uint64_t>& grids);
+	std::list<AoiPoint*> AoiMgr::GetNearPoints(Point2D pos, float dis, uint64_t flag, int maxCount=0);
+
+
 public:
 	Point2D mapSize;
 	uint32_t gridSize;
 private:
-
 	uint32_t const maxGridsCount = 100;
-
-
 public:
 	CustomMap<uint64_t, AoiPoint*, 64, 0> pointMap;
 	std::map<uint64_t, AoiGrid*> gridMap;
