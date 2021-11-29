@@ -21,8 +21,6 @@ class AoiPoint;
 class FlagFilter;
 class AoiTrigger;
 typedef void(*ForeachPointFun)(AoiPoint*, void*);
-typedef void(*ForeachGridFun)(AoiGrid*, void*);
-typedef void(*ForeachTriggerFun)(AoiTrigger*, void*);
 /******************************************** AoiPoint ***************************************/
 
 class AoiPoint
@@ -36,17 +34,17 @@ public:
 	void BindTrigger(uint32_t triggerId);
 	void UpdateTriggers();
 
-	uint64_t flag;
-	uint16_t flagType;
-
-	AoiGrid* pGrid;
-	uint64_t uid;
+	uint64_t flag; 
+	// 0 ~ Complex_Flag_Type，记录放在grid的哪个head下
+	uint16_t flagType; 
 
 	list_head head;
 
+	AoiGrid* pGrid;
+	uint64_t uid;
 	Point2D pos;
 
-	std::set<uint64_t> triggerSet;
+	std::set<uint32_t> triggerSet; //绑定的triggerid集合
 };
 
 /******************************************** AoiGrid***************************************/
@@ -85,17 +83,17 @@ public:
 	void ForeachPoint(FlagFilter filter, ForeachPointFun fun,void* args);
 	void ForeachTrigger(AoiPoint* point);
 
-	list_head flagHead[All_Flag_Type];
+	// 放point的head,[0,64]放单个flag，Complex_Flag_Type放组合flag
+	list_head flagHead[All_Flag_Type]; 
 
 	uint64_t complexFlag;
 	uint64_t singleFlag;
 
+	// grid格子对应的矩形
 	Custom_Develop::Rectangle box;
 
 	//和触发器的位置关系（包含和相交,在触发器外会被移除)
 	std::map<uint32_t, EPosionalType> triggerSideMap;
-
-	void Debug();
 
 	AoiMgr* pMgr;
 private:
@@ -107,8 +105,8 @@ private:
 struct GridHandleArgs
 {
 	AoiTrigger* pTrigger;
-	EPosionalType enterSide;
-	EPosionalType exitSide;
+	EPosionalType enterSide; //和进入圆的关系
+	EPosionalType exitSide;//和离开圆的关系
 
 };
 
@@ -127,15 +125,17 @@ public:
 	AoiTrigger(uint64_t flag,float enterDis,float cacheDis);
 	~AoiTrigger();
 
+	// 该触发器过滤哪些flag的point
 	FlagFilter filter;
 
+	// 进入、离开距离，使用一段缓冲带来避免频繁增删
 	float enterDis;
 	float exitDis;
 	
+	// 跟内圈 相交、包含关系的格子
 	std::set<uint64_t> gridSet;
+	//触发器内的point
 	std::set<uint64_t> pointSet;
-	
-	
 
 	AoiMgr* pMgr;
 

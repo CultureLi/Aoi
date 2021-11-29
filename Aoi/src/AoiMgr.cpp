@@ -98,8 +98,8 @@ AoiGrid::AoiGrid(const GridKey& key,AoiMgr* mgr):key(key),pMgr(mgr)
 	for (int i=0;i <= Complex_Flag_Type;i++)
 		INIT_LIST_HEAD(flagHead+i);
 	
-	box.topLeft = Point2D(key.x, key.y)*pMgr->gridSize;
-	box.bottomRight = box.topLeft + Point2D(pMgr->gridSize, pMgr->gridSize);
+	box.topLeft = Point2D((float)key.x, (float)key.y)* (float)pMgr->gridSize;
+	box.bottomRight = box.topLeft + Point2D((float)pMgr->gridSize, (float)pMgr->gridSize);
 }
 
 
@@ -132,15 +132,15 @@ void AoiGrid::ForeachTrigger(AoiPoint* point)
 		if ((pTrigger->filter.flag & point->flag) == 0)
 			continue;
 
-		
+
 		Circle enterCircle = Circle(pTrigger->pos, pTrigger->enterDis);
-		Circle exitCircle = Circle(pTrigger->pos, pTrigger->exitDis);
-			
+
+		auto side = enterCircle.CheckPosionalSide(point->pGrid->box);
 		GridHandleArgs args
 		{
 			pTrigger,
-			enterCircle.CheckPosionalSide(point->pGrid->box),
-			exitCircle.CheckPosionalSide(point->pGrid->box)
+			side,
+			side
 		};
 
 		HandlePointInTrigger(point, (void*)&args);
@@ -187,21 +187,6 @@ void AoiGrid::DelPoint(AoiPoint* point)
 	//std::cout << str_format("AoiGrid DelPoint center:(%d,%d)	point:(%f,%f)", key.x, key.y, point.pos.x, point.pos.y) << std::endl;
 }
 
-void AoiGrid::Debug()
-{
-	AoiPoint* p;
-	
-	for (int i = 0; i <= Complex_Flag_Type; ++i)
-	{
-		uint32_t count = 0;
-		list_for_each_entry(p, flagHead + i, head)
-		{
-			count++;
-		}
-		if (count > 0)
-			std::cout << str_format("grid:(%d,%d) index:%d count:%d",key.x,key.y,i,count) << std::endl;
-	}
-}
 
 void AoiGrid::ForeachPoint(FlagFilter filter, ForeachPointFun fun, void* args)
 {
@@ -268,9 +253,11 @@ void AoiTrigger::UpdateGrid()
 	GridKey gMin = pMgr->CalcGridKey(enterRect.topLeft);
 	GridKey gMax = pMgr->CalcGridKey(enterRect.bottomRight);
 
-	for (int x = gMin.x; x <= gMax.x; x++)
+
+	// 跟外切矩形相交、包含的grid
+	for (uint32_t x = gMin.x; x <= gMax.x; x++)
 	{
-		for (int y = gMin.y; y <= gMax.y; y++)
+		for (uint32_t y = gMin.y; y <= gMax.y; y++)
 		{
 			uint64_t key = GENUUID64(x, y);
 			AoiGrid* pGrid = pMgr->gridMap[key];
@@ -297,7 +284,7 @@ void AoiTrigger::UpdateGrid()
 
 		EPosionalType oldEnterSide = pGrid->triggerSideMap[this->uid];
 		EPosionalType newEnterSide = enterCircle.CheckPosionalSide(pGrid->box);
-		EPosionalType exitside = exitCircle.CheckPosionalSide(pGrid->box);
+		
 		pGrid->triggerSideMap[this->uid] = newEnterSide;
 
 		if (oldEnterSide == EPosionalType::E_Inside && newEnterSide == EPosionalType::E_Inside)
@@ -305,6 +292,7 @@ void AoiTrigger::UpdateGrid()
 			continue;
 		}
 
+		EPosionalType exitside = exitCircle.CheckPosionalSide(pGrid->box);
 		GridHandleArgs args = { this,newEnterSide,exitside };
 		pGrid->ForeachPoint(filter, HandlePointInTrigger, (void*)&args);
 

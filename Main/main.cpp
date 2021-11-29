@@ -37,7 +37,7 @@ void Draw(AoiMgr* mgr)
 			AoiGrid* pGrid = iter1->second;
 			if (pTrigger->gridSet.find(iter1->first) != pTrigger->gridSet.end())
 			{
-				setlinecolor(0xFFBF00);
+				setlinecolor(0x800080);
 				setlinestyle(PS_SOLID | PS_JOIN_BEVEL, 3);
 			}
 			else
@@ -143,7 +143,7 @@ int main()
 		mgr->AddAoiPoint(new AoiPoint(mgr,rand()%5, Point2D(rand()%int(mapSize.x),rand()%int(mapSize.y))));
 	}
 
-	auto id = mgr->CreateTrigger(1, 200, 50);
+	auto id = mgr->CreateTrigger(1, 200, 20);
 
 	controlPoint->BindTrigger(id);
 
