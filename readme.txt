@@ -1,0 +1,1 @@
+将ConsoleLoggerHelper.exe放入可执行文件根目录，用于输出打印

@@ -10,24 +10,43 @@ using namespace std;
 void HandlePointInTrigger(AoiPoint* point, void* args)
 {
 	GridHandleArgs* pArgs = (GridHandleArgs*)args;
-
+	int action = 0;
 	if (pArgs->enterSide == EPosionalType::E_Inside)
 	{
-		pArgs->pTrigger->pointSet.insert(point->uid);
+		action = 1;
 	}
 	else if (pArgs->exitSide == EPosionalType::E_Outside)
 	{
-		pArgs->pTrigger->pointSet.erase(point->uid);
+		action = -1;
 	}
 	else if (pArgs->enterSide == EPosionalType::E_Intersect
 		|| pArgs->exitSide == EPosionalType::E_Intersect)
 	{
 		float distance = Point2D::Distance(point->pos, pArgs->pTrigger->pos);
 		if (distance < pArgs->pTrigger->enterDis)
-			pArgs->pTrigger->pointSet.insert(point->uid);
+			action = 1;
 		else if (distance > pArgs->pTrigger->exitDis)
-			pArgs->pTrigger->pointSet.erase(point->uid);
+			action = -1;
 	}
+
+	auto bHas = (pArgs->pTrigger->pointSet.find(point->uid) != pArgs->pTrigger->pointSet.end());
+	if (action == 1)
+	{
+		if (!bHas)
+		{
+			pArgs->pTrigger->pointSet.insert(point->uid);
+			pArgs->pTrigger->EnterTriggerCallBack(point);
+		}
+	}
+	else if (action == -1)
+	{
+		if (bHas)
+		{
+			pArgs->pTrigger->pointSet.erase(point->uid);
+			pArgs->pTrigger->ExitTriggerCallBack(point);
+		}
+	}
+
 
 }
 
@@ -227,7 +246,8 @@ FlagFilter::FlagFilter(uint64_t flag)
 }
 
 
-AoiTrigger::AoiTrigger(uint64_t flag, float enterDis, float cacheDis):filter(flag)
+AoiTrigger::AoiTrigger(uint64_t flag, float enterDis, float cacheDis, TriggerCallBack entercb, TriggerCallBack exitcb):
+	filter(flag),EnterTriggerCallBack(entercb),ExitTriggerCallBack(exitcb)
 {
 	this->enterDis = enterDis;
 	this->exitDis = enterDis+cacheDis;
@@ -239,14 +259,8 @@ AoiTrigger::~AoiTrigger()
 
 }
 
+
 void AoiTrigger::Update()
-{
-	UpdateGrid();
-}
-
-
-
-void AoiTrigger::UpdateGrid()
 {
 	Circle enterCircle = Circle(pos, enterDis);
 	Rectangle enterRect = enterCircle.GetOutSideRect();
@@ -359,9 +373,9 @@ void AoiMgr::AddAoiPoint(AoiPoint* point)
 	
 }
 
-uint32_t AoiMgr::CreateTrigger(uint64_t flag, float enterDis, float cacheDis)
+uint32_t AoiMgr::CreateTrigger(uint64_t flag, float enterDis, float cacheDis, TriggerCallBack entercb, TriggerCallBack exitcb)
 {
-	AoiTrigger* pTrigger = new AoiTrigger(flag, enterDis, cacheDis);
+	AoiTrigger* pTrigger = new AoiTrigger(flag, enterDis, cacheDis,entercb,exitcb);
 	pTrigger->pMgr = this;
 	pTrigger->uid = triggerMap.AddData(pTrigger);
 	return pTrigger->uid;
@@ -424,10 +438,10 @@ void CollectPoint(AoiPoint* point,void* args)
 }
 
 
-class dis_sorter
+class DistanceLessSorter
 {
 public:
-	dis_sorter(Point2D c) :center(c) {};
+	DistanceLessSorter(Point2D c) :center(c) {};
 	Point2D center;
 
 	bool operator () (const AoiPoint* p1, const AoiPoint* p2)
@@ -464,7 +478,7 @@ std::list<AoiPoint*> AoiMgr::GetNearPoints(Point2D pos,float dis, uint64_t flag,
 	}
 	
 
-	lst.sort(dis_sorter(pos));
+	lst.sort(DistanceLessSorter(pos));
 	if (maxCount > 0 && lst.size() > maxCount)
 		lst.resize(maxCount);
 

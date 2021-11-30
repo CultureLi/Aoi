@@ -5,7 +5,7 @@
 
 #include "Point2D.h"
 #include "AoiMgr.h"
-
+#include "ConsoleLogger.h"
 Point2D mapSize = Point2D(1024, 1024);
 
 
@@ -15,6 +15,7 @@ uint32_t halfSize = gridSize / 2;
 AoiPoint* controlPoint;
 AoiPoint* controlPoint2;
 Point2D mousePos;
+CConsoleLoggerEx console;
 
 void Draw(AoiMgr* mgr)
 {
@@ -160,6 +161,20 @@ void CollectTest(AoiMgr* mgr)
 	
 }
 
+void enterCb(AoiPoint* point)
+{
+	auto s = str_format("进入 %d \n", point->uid);
+	console.cprintf(s.c_str());
+}
+void exitCb(AoiPoint* point)
+{
+	auto s = str_format("离开 %d \n", point->uid);
+	console.cprintf(s.c_str());
+}
+
+
+
+
 int main()
 {	
 	initgraph(mapSize.x+gridSize, mapSize.y+gridSize);	// 地图大小
@@ -177,30 +192,33 @@ int main()
 		mgr->AddAoiPoint(new AoiPoint(mgr,rand()%5, Point2D(rand()%int(mapSize.x),rand()%int(mapSize.y))));
 	}
 
-	auto id = mgr->CreateTrigger(1, 200, 20);
+	auto id = mgr->CreateTrigger(1, 200, 20,enterCb,exitCb);
 
 	controlPoint->BindTrigger(id);
+
+	///////////////////////////////////
+	
+	console.Create("This is the first console",-1,-1,NULL,"ConsoleLoggerHelper.exe");
+	console.cprintf(CConsoleLoggerEx::COLOR_WHITE | CConsoleLoggerEx::COLOR_BACKGROUND_BLUE, "White on Blue");
+
+
+	/////////////////////////////////
 	
 	//	// 画圆，圆心(200, 200)，半径 100
 	double lastUpdate = GetTickCount();
 	while (true)
 	{
 		MessageOpe(mgr);
-		if (GetTickCount() - lastUpdate > 30)
-		{
-			lastUpdate = GetTickCount();
-			cleardevice();
-			BeginBatchDraw();
-			Draw(mgr);
-			//CollectTest(mgr);
-			EndBatchDraw();
-		}
+
+		lastUpdate = GetTickCount();
+		clearcliprgn();
+		BeginBatchDraw();
+		Draw(mgr);
+		//CollectTest(mgr);
+		EndBatchDraw();
+
 	}
 
-
-	_getch();
-	closegraph();			// 关闭绘图窗口
-	std::cout << "sssss";
 	return 0;
 }
 

@@ -21,6 +21,7 @@ class AoiPoint;
 class FlagFilter;
 class AoiTrigger;
 typedef void(*ForeachPointFun)(AoiPoint*, void*);
+typedef void(*TriggerCallBack)(AoiPoint*);
 /******************************************** AoiPoint ***************************************/
 
 class AoiPoint
@@ -122,7 +123,7 @@ public:
 class AoiTrigger
 {
 public:
-	AoiTrigger(uint64_t flag,float enterDis,float cacheDis);
+	AoiTrigger(uint64_t flag,float enterDis,float cacheDis, TriggerCallBack entercb, TriggerCallBack exitcb);
 	~AoiTrigger();
 
 	// 该触发器过滤哪些flag的point
@@ -137,14 +138,15 @@ public:
 	//触发器内的point
 	std::set<uint64_t> pointSet;
 
+	TriggerCallBack EnterTriggerCallBack;
+	TriggerCallBack ExitTriggerCallBack;
+
 	AoiMgr* pMgr;
 
 	uint32_t uid;
 	Point2D pos;
 
 	void Update();
-	void UpdateGrid();
-	void UpdatePoint();
 
 };
 
@@ -161,7 +163,7 @@ public:
 
 	void AddAoiPoint(AoiPoint*);
 	AoiGrid* AddGrid(const GridKey& center);
-	uint32_t CreateTrigger(uint64_t flag, float enterDis, float cacheDis);
+	uint32_t CreateTrigger(uint64_t flag, float enterDis, float cacheDis, TriggerCallBack entercb, TriggerCallBack exitcb);
 
 	void CalcGridsInRange(Circle circle, std::set<uint64_t>& grids);
 	std::list<AoiPoint*> AoiMgr::GetNearPoints(Point2D pos, float dis, uint64_t flag, int maxCount=0);
